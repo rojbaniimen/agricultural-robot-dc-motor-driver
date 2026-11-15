@@ -17,9 +17,9 @@
 
 ## 🎯 Engineering Overview & System Architecture
 
-Autonomous agricultural robots operating on uneven terrain require rugged, high-efficiency traction electronics capable of handling continuous currents up to **16 A** (with **40 A** startup surges), harsh thermal environments (up to **60 °C**), and electromagnetic interference (EMI) without relying on fragile monolithic ICs.
+Autonomous agricultural robots operating on uneven terrain require rugged, high-efficiency traction electronics capable of handling continuous currents up to **16 A** (with **40 A** startup surges), harsh thermal environments (up to **60 °C**), and electromagnetic interference (EMI) without relying on fragile monolithic ICs[cite: 13, 14, 15].
 
-This project delivers a complete **discrete full H-Bridge DC motor driver** engineered from first-principles power calculations to PCB manufacturing and field validation on a 4WD agricultural robot:
+This project delivers a complete **discrete full H-Bridge DC motor driver** engineered from first-principles power calculations to PCB manufacturing and field validation on a 4WD agricultural robot[cite: 11, 14, 47]:
 
 ```text
 ┌──────────────────────────┐    CAN Bus (1 Mbit/s)    ┌──────────────────────────┐    20 kHz PWM + SD    ┌────────────────────────────────────┐
@@ -32,8 +32,21 @@ This project delivers a complete **discrete full H-Bridge DC motor driver** engi
                                                                                                             │  Brushed DC Traction Motor   │
                                                                                                             │  Ra = 0.8 Ω  |  La = 1.2 mH  │
                                                                                                             └──────────────────────────────┘
-
 ```
+
+## 🔄 H-Bridge Operating Principles (Forward & Reverse Modes)
+
+<div align="center">
+  <img src="hardware/principle_forward.png" alt="H-Bridge Forward Motion Principle" width="48%"/>
+  <img src="hardware/principle_reverse.png" alt="H-Bridge Reverse Motion Principle" width="48%"/>
+  <p><em>Left: Forward Motion (Q1 + Q4 conducting, A → B) &nbsp;|&nbsp; Right: Reverse Motion (Q3 + Q2 conducting, B → A)</em></p>
+</div>
+
+* **Unipolar PWM Modulation (20 kHz):** Only one half-bridge switches at 20 kHz while the opposite low-side MOSFET remains held ON, cutting switching losses by **50%** compared to bipolar PWM while maintaining a low current ripple (**ΔI = 0.20 A**).
+* **Bidirectional Torque & Braking:** Supports smooth forward/reverse transitions via linear acceleration ramps (0 → 100% in 2.0 s), coasting (freewheel), and active/passive dynamic braking.
+
+---
+
 ## 🛠️ Hardware Design & Altium Designer Implementation
 
 ### 1. Electrical Schematic (`SchDoc`)
@@ -45,14 +58,27 @@ This project delivers a complete **discrete full H-Bridge DC motor driver** engi
 * **Bootstrap High-Side Supply (`C1, C2` = 100 nF / 25 V X7R + `D1, D2` = 1N4148):** Dimensioned for a total gate + UVLO + leakage charge of **85.5 nC** with a 5× safety factor, sustaining up to **98% duty cycle at 20 kHz**.
 * **Power Switching Stage (`Q1–Q4` — IRFZ44N, TO-220):** Low conduction resistance (**R<sub>DS(on)</sub> = 17.5 mΩ**), **55 V** breakdown rating, and **49 A** continuous drain capability, fitted with **10 Ω** gate resistors to damp parasitic LC ringing and control **dV/dt**.
 
-### 2. Two-Layer Power PCB Layout (`PcbDoc` — IPC-2221 Compliant)
+### 2. Two-Layer Power PCB Layout & 3D Assembly (`PcbDoc` — IPC-2221)
 <div align="center">
-  <img src="hardware/altium_pcb_routing.png" alt="Altium Designer 2-Layer PCB Routing with Ground Plane" width="90%"/>
+  <img src="hardware/altium_pcb_routing.png" alt="Altium Designer 2-Layer PCB Routing with Ground Plane" width="48%"/>
+  <img src="hardware/altium_pcb_3d.png" alt="Altium Designer 3D PCB View with TO-220 Heatsinks" width="48%"/>
+  <p><em>Left: 2-Layer Copper Routing & Ground Plane &nbsp;|&nbsp; Right: 3D Mechanical Assembly with TO-220 Clip-On Heatsinks</em></p>
 </div>
 
 * **Board Stackup & Dimensions:** 2-layer FR4 (**1.6 mm** thickness, **100 × 80 mm** footprint) with **70 µm (2 oz) heavy copper** for high-current thermal and electrical robustness.
 * **IPC-2221 Power Track Sizing:** Calculated minimum width of 0.54 mm at ΔT = 20 °C, scaled with a **6× safety factor to 3.0 mm** wide power traces (`PB` battery bus, switching nodes, and `PM` motor terminals).
-* **EMI Shielding & Low-Inductance Loops:** Solid bottom-layer ground plane stitched with **0.8 mm vias** every 2 mm, symmetric half-bridge placement, and local decoupling (`2200 µF / 50 V` bulk electrolytic + `100 nF` X7R ceramic within 1–2 mm of driver pins).
+* **EMI Shielding & Thermal Management:** Solid bottom-layer ground plane stitched with **0.8 mm vias** every 2 mm, symmetric half-bridge placement, local ceramic/bulk decoupling, and TO-220 clip-on heatsinks (**R<sub>th</sub> ≈ 10 °C/W**).
+
+---
+
+## 🎥 Functional Simulation (`Proteus ISIS`)
+
+<div align="center">
+  <video src="hardware/proteus_simulation.mp4" controls width="85%"></video>
+  <p><em>Proteus ISIS Real-Time Validation: Bidirectional Motor Control (Forward, Reverse & Stop) with IR2104 Bootstrap & Dead-Time</em></p>
+</div>
+
+* **Dynamic Bidirectional Verification:** Demonstrates real-time switching between forward rotation (right driver active, counter-clockwise shaft rotation), reverse rotation (left driver active, clockwise shaft rotation), and clean braking/stop without shoot-through.
 
 ---
 
@@ -72,7 +98,7 @@ This project delivers a complete **discrete full H-Bridge DC motor driver** engi
 
 ## 💻 Real-Time Embedded Firmware (`STM32F407G`)
 
-* **Unipolar PWM Strategy (20 kHz):** Configured on **TIM1** (`APB2 = 168 MHz`, `PSC = 0`, `ARR = 8399`), cutting switching losses by **50%** compared to bipolar modulation while maintaining low current ripple (**ΔI = 0.20 A**).
+* **Unipolar PWM Generation (20 kHz):** Configured on **TIM1** (`APB2 = 168 MHz`, `PSC = 0`, `ARR = 8399`), implemented in [`firmware/motor_driver_stm32.c`](firmware/motor_driver_stm32.c).
 * **Sub-Microsecond Hardware Overcurrent Protection:** An **LM393** comparator monitors the 10 mΩ shunt resistor (`200 mV` threshold = **20 A**), triggering an STM32 **EXTI interrupt** and pulling the IR2104 `SD` shutdown pins LOW in **< 1.2 µs**.
 * **CAN Bus Telemetry (`1 Mbit/s`):** Exchanges real-time velocity commands (`0x101 / 0x102`), encoder RPM + current feedback (`0x201 / 0x202`), and fault alarms (`0x301`) with a **Raspberry Pi 4 (ROS2)** master controller.
 
@@ -99,7 +125,11 @@ Tested on a laboratory bench using a **Rigol DS1054Z** oscilloscope, **Testec TT
 agricultural-robot-dc-motor-driver/
 ├── hardware/
 │   ├── altium_schematic_hbridge.png      # Full H-Bridge electrical schematic (Altium Designer)
-│   └── altium_pcb_routing.png            # 2-layer PCB routing & ground plane (Altium Designer)
+│   ├── altium_pcb_routing.png            # 2-layer PCB routing & ground plane (Altium Designer)
+│   ├── altium_pcb_3d.png                 # 3D PCB model with TO-220 clip-on heatsinks
+│   ├── principle_forward.png             # H-Bridge forward current flow diagram
+│   ├── principle_reverse.png             # H-Bridge reverse current flow diagram
+│   └── proteus_simulation.mp4            # Proteus ISIS bidirectional motor simulation video
 ├── firmware/
 │   └── motor_driver_stm32.c              # STM32F407G HAL driver (20 kHz TIM1, ramp, EXTI fault)
 ├── Rapport_PFA2_Driver_Moteur_DC.pdf     # Full engineering report (calculations, PCB, tests)
