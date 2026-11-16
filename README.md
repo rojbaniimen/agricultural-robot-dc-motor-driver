@@ -38,7 +38,6 @@ This project delivers a complete **discrete full H-Bridge DC motor driver** engi
 
 <div align="center">
   <img src="hardware/principle_forward.png" alt="H-Bridge Forward Motion Principle" width="48%"/>
-  <img src="hardware/principle_reverse.png" alt="H-Bridge Reverse Motion Principle" width="48%"/>
   <p><em>Left: Forward Motion (Q1 + Q4 conducting, A → B) &nbsp;|&nbsp; Right: Reverse Motion (Q3 + Q2 conducting, B → A)</em></p>
 </div>
 
